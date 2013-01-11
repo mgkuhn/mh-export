@@ -65,12 +65,18 @@ sub process {
 	}
     }
 
-    # prepare fake From_ line if
+    # prepare fake From_ line if none found in input
     if (!defined $date) {
 	if (defined $header{'Delivery-date'} &&
 	    defined ${$header{'Delivery-date'}}[0]) {
-	    ${$header{'Delivery-date'}}[0] =~ /(Mon|Tue|Wed|Thu|Fri|Sat|Sun), ([ 0-3][0-9]) (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) ([12]\d\d\d) ([012]\d:[0-5]\d:[0-5]\d)( [\+-]\d\d\d\d)/
+	    ${$header{'Delivery-date'}}[0] =~ /(Mon|Tue|Wed|Thu|Fri|Sat|Sun), ?([ 0-3][0-9]) (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) ([12]\d\d\d) ([012]\d:[0-5]\d:[0-5]\d)( [\+-]\d\d\d\d)/
 		or die("unexpected delivery-date '${$header{'Delivery-date'}}[0]'");
+	    $date = "$1 $3 $2 $5 $4";  # use local time (for simplicity)
+	    $moreinfo = $6 if $6;
+	} elsif (defined $header{'Received'} &&
+	    defined ${$header{'Received'}}[0]) {
+	    ${$header{'Received'}}[0] =~ /(Mon|Tue|Wed|Thu|Fri|Sat|Sun), ?([ 0-3][0-9]) (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) ([12]\d\d\d) ([012]\d:[0-5]\d:[0-5]\d)( [\+-]\d\d\d\d)/
+		or die("unexpected received date '${$header{'Delivery-date'}}[0]'");
 	    $date = "$1 $3 $2 $5 $4";  # use local time (for simplicity)
 	    $moreinfo = $6 if $6;
 	} else {
@@ -155,7 +161,8 @@ while (@ARGV) {
 	opendir my $d, $fn or die("Cannot read directory '$fn': $!\n");
 	my @files = readdir $d;
 	closedir $d;
-	unshift @ARGV, map { "$fn/$_" } sort {$a <=> $b} grep { /\d+/ } @files;
+	unshift @ARGV, (map { "$fn/$_" } sort {$a <=> $b}
+			grep { /^\d+$/ } @files);
 	next;
     }
     print STDERR "$fn\n" if $verbose;
