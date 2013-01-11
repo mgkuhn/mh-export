@@ -1,9 +1,8 @@
 #!/usr/bin/perl -w
-# Convert Computer Laboratory MH mail files into mboxrd format
-# http://www.qmail.org/qmail-manual-html/man5/mbox.html
+# Export Computer Laboratory MH mail files into other mailbox formats
 
-# This script is meant as a replacement for packf, fixing the following
-# problems:
+# This script was written as a replacement for packf, fixing the
+# following problems:
 #
 #   - discards Resent: headers that have been prepended to a message
 #     by the MUA after it was delivered (exmh adds these, but they
@@ -15,6 +14,10 @@
 #   - Perform the reversible >From_ escaping defined by Rahul Dhesi
 #     (packf appears to generate mboxo rather than mboxrd)
 #
+#   - Also support the much safer MMDF mailbox format
+#
+# Unlike with a proper MH tool like packf, you have to specify
+# folders and messages via their Unix pathnames.
 
 use strict;
 
@@ -62,18 +65,14 @@ sub process {
 	}
     }
 
-    # escape spurious From_ lines
-    $msg =~ s/^(>*From )/>$1/gm;
-    die("unterminated final line") unless $msg =~ /\n$/; 
-    $msg .= "\n" unless $msg =~ /\n\n$/;  # seems only needed for sent messages
-
     # prepare fake From_ line if
     if (!defined $date) {
 	if (defined $header{'Delivery-date'} &&
 	    defined ${$header{'Delivery-date'}}[0]) {
-	    ${$header{'Delivery-date'}}[0] =~ /(Mon|Tue|Wed|Thu|Fri|Sat|Sun), ([ 0-3][0-9]) (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) ([12]\d\d\d) ([012]\d:[0-5]\d:[0-5]\d) (\+0[01]00)/
+	    ${$header{'Delivery-date'}}[0] =~ /(Mon|Tue|Wed|Thu|Fri|Sat|Sun), ([ 0-3][0-9]) (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) ([12]\d\d\d) ([012]\d:[0-5]\d:[0-5]\d)( [\+-]\d\d\d\d)/
 		or die("unexpected delivery-date '${$header{'Delivery-date'}}[0]'");
 	    $date = "$1 $3 $2 $5 $4";  # use local time (for simplicity)
+	    $moreinfo = $6 if $6;
 	} else {
 	    $date = 'Thu Jan  1 00:00:00 1970'; # dummy date
 	}
@@ -95,20 +94,86 @@ sub process {
 	$moreinfo = '';
     }
 
-    return "From $envsender $date$moreinfo\n" . $msg;
+    die("unterminated final line") unless $msg =~ /\n$/; 
+
+    return ("From $envsender $date$moreinfo\n", $msg);
 }
 
-foreach my $fn (@ARGV) {
-    if (-d $fn) { warn("$fn: skipping directory\n"); next; }
+# Convert mail data of a single message into mboxrd mailbox format.
+# Prefix each message with a From_ line, then concatenate result
+# to form multi-message mailboxes.
+# http://www.qmail.org/qmail-manual-html/man5/mbox.html
+sub to_mboxrd {
+    my ($data) = @_;
+    # escape spurious From_ lines
+    $data =~ s/^(>*From )/>$1/gm;
+    $data .= "\n" unless $data =~ /\n\n$/;  # seems only needed for sent messages
+    return $data;
+}
+
+# Convert mail data of a single message into MMDF mailbox format.
+# Concatenate output to form multi-message mailboxes.
+# http://www.tin.org/bin/man.cgi?section=5&topic=mmdf
+sub to_mmdf {
+    my ($data) = @_;
+    return "\1\1\1\1\n$data\1\1\1\1\n";
+}
+
+unless (@ARGV) {
+    printf STDERR <<EOT;
+This tool takes a list of MH message files and exports them to
+other mailbox formats.
+
+Usage: mh-export [options] path ...
+
+Options:
+
+  -f mmdf    standard output in mmdf format (default)
+  -f mboxrd  standard output in mboxrd format
+
+Command-line arguments are a list of file pathnames to individual MH
+messages. If a path is to a directory, all files in that with names
+consisting only of digits 0-9 will be processed. Use options to
+indicate in which form the messages should be output.
+
+EOT
+}
+
+my $format = 'mmdf';
+my $verbose = 0;
+
+while (@ARGV) {
+    if ($ARGV[0] eq '-f') {
+	shift @ARGV; $format = shift @ARGV; next;
+    }
+    if ($ARGV[0] eq '-v') {
+	shift @ARGV; $verbose++; next;
+    }
+    my $fn = shift @ARGV;
+    if (-d $fn) {
+	warn("$fn: expanding directory\n") if $verbose;
+	opendir my $d, $fn or die("Cannot read directory '$fn': $!\n");
+	my @files = readdir $d;
+	closedir $d;
+	unshift @ARGV, map { "$fn/$_" } sort {$a <=> $b} grep { /\d+/ } @files;
+	next;
+    }
+    print STDERR "$fn\n" if $verbose;
     open my $f, '<', $fn or die("Cannot read '$fn': $!\n");
     local $/;  # enable localized slurp mod
-    my $msg = <$f>;
+    my $mh = <$f>;
     close $f;
-    my $out;
+    my ($from, $data);
     eval { 
 	local $SIG{__WARN__} = sub { die $_[0] };
-	$out = process($msg);
+	($from, $data) = process($mh);
     };
     die("$fn: $@") if $@;
-    print $out;
+    if ($format eq 'mboxrd') {
+	print $from, to_mboxrd($data);
+    } elsif ($format eq 'mmdf') {
+	print to_mmdf($from . $data);
+    } else {
+	die("unknown --format value '$format'\n");
+    }
 }
