@@ -35,6 +35,10 @@ More verbose output.
 
 Select mailbox format for output: mmdf (default), mbox.
 
+=item -s
+
+Set the "seen" (read) flag for all messages.
+
 =item -t
 
 Strip trailing empty lines from messages.
@@ -113,6 +117,7 @@ Options:
   -v         verbose output
   -f mmdf    standard output in mmdf format (default)
   -f mboxrd  standard output in mboxrd format
+  -s         mark all messages as seen/read
   -t         strip trailing empty lines of mail messages
 
 Command-line arguments are a list of file pathnames to individual MH
@@ -125,6 +130,7 @@ EOT
 
 my $debug = 0;
 my $strip = 0;
+my $seen = 0;
 
 sub process {
     my ($fn) =@_;
@@ -168,6 +174,10 @@ sub process {
 	}
     }
 
+    # Add C-Client compatible status flags in header
+    # http://wiki.dovecot.org/MailboxFormat/mbox
+    $msg = "X-Status: A\n" . $msg if $stripped{'Replied'};  # \Answered
+    $msg =   "Status: R\n" . $msg if $seen;                 # \Seen
     # restore stripped headers
     foreach my $s (sort {$a cmp $b} keys %stripped) {
 	while (my $r = pop @{$stripped{$s}}) {
@@ -261,6 +271,9 @@ while (@ARGV) {
     }
     if ($ARGV[0] eq '-t') {
 	shift @ARGV; $strip++; next;
+    }
+    if ($ARGV[0] eq '-s') {
+	shift @ARGV; $seen++; next;
     }
     my $fn = shift @ARGV;
     if (-d $fn) {
