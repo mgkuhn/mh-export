@@ -1,31 +1,142 @@
 #!/usr/bin/perl -w
 # Export Computer Laboratory MH mail files into other mailbox formats
+# Markus Kuhn <http://www.cl.cam.ac.uk/~mgk25/> -- 2013-01-14
 
-# This script was written as a replacement for packf, fixing the
-# following problems:
-#
-#   - discards Resent: headers that have been prepended to a message
-#     by the MUA after it was delivered (exmh adds these, but they
-#     are not RFC 2822 and can preceed the From_ line)
-#
-#   - preserves existing From_ lines, rather than making up a
-#     new one instead
-#
-#   - Perform the reversible >From_ escaping defined by Rahul Dhesi
-#     (packf appears to generate mboxo rather than mboxrd)
-#
-#   - Also support the much safer MMDF mailbox format
-#
-# Unlike with a proper MH tool like packf, you have to specify
-# folders and messages via their Unix pathnames.
+=head1 NAME
+
+mh-export - export MH mail files into other mailbox formats
+
+=head1 SYNOPSIS
+
+mh-export [options] path ...
+
+mhpath ... | xargs mh-export [options]
+
+=head1 DESCRIPTION
+
+The path values given on the command line can either be individual MH
+messages or entire MH folders. If a folder is provided, the tool reads
+all messages in it in numercial order, but does not recurse into
+subfolders.
+
+Unlike with MH tools such packf, you have to specify folders and
+messages via their Unix pathnames. Use mhpath if you desire the full
+MH message selection syntax.
+
+=head1 OPTIONS
+
+=over 12
+
+=item -v
+
+More verbose output.
+
+=item -f I<format>
+
+Select mailbox format for output: mmdf (default), mbox.
+
+=item -t
+
+Strip trailing empty lines from messages.
+
+=back
+
+=head1 APPLICATIONS
+
+If you want to migrate your MH folders onto an IMAP server, use this
+tool to prepare input for the "mailutil copy" tool from the University
+of Washington IMAP distribution.
+
+=head1 BACKGROUND
+
+This tool was written as a replacement for the MH tool packf. It has
+the following important features that are missing in packf and the
+lack of which can lead to a loss of information:
+
+=over 2
+
+=item *
+Handle Resent: and Replied: headers that have been prepended to
+a message by the MUA after it was delivered. Exmh adds these,
+but they are not RFC 2822 and can preceed the From_ line.
+
+=item *
+Try to preserve as much informaion as possible in the From_
+lines, rather than inserting just a dummy one. In particular,
+try hard to estimate the delivery time.
+
+=item *
+Perform the reversible >From_ escaping defined by Rahul Dhesi
+(packf appears to generate mboxo rather than mboxrd).
+
+=item *
+
+Support in addition the MMDF mailbox format (default), which does not
+require any >From_ escaping.
+
+=back
+
+=head1 REFERENCES
+
+=over 2
+
+=item *
+L<MMDF mailbox file format|http://www.tin.org/bin/man.cgi?section=5&topic=mmdf>
+
+=item *
+L<mboxrd file format|http://www.qmail.org/qmail-manual-html/man5/mbox.html>
+
+=back
+
+=head1 AUTHOR
+
+L<Markus Kuhn|http://www.cl.cam.ac.uk/~mgk25/>, January 2013.
+
+=head1 SEE ALSO
+
+packf(1), mhpath(1), mailutil(1), 
+
+=cut
 
 use strict;
+use POSIX qw(asctime);
+
+unless (@ARGV) {
+    printf STDERR <<EOT;
+This tool takes a list of MH message files and exports them to
+other mailbox formats.
+
+Usage: mh-export [options] path ...
+
+Options:
+
+  -v         verbose output
+  -f mmdf    standard output in mmdf format (default)
+  -f mboxrd  standard output in mboxrd format
+  -t         strip trailing empty lines of mail messages
+
+Command-line arguments are a list of file pathnames to individual MH
+messages. If a path is to a directory, all files in that with names
+consisting only of digits 0-9 will be processed. Use options to
+indicate in which form the messages should be output.
+
+EOT
+}
 
 my $debug = 0;
+my $strip = 0;
 
 sub process {
-    my ($msg) =@_;
+    my ($fn) =@_;
+    my $msg;
     
+    open my $f, '<', $fn or die("$!\n");
+    {
+	local $/;  # enable localized slurp mod
+	$msg = <$f>;
+    }
+    close $f;
+
     # strip leading Resent:/Replied: headers
     my %stripped;
     while ($msg =~ s/^(Resent|Replied|X-\S+): (.*)\n//) {
@@ -65,27 +176,39 @@ sub process {
 	}
     }
 
-    # prepare fake From_ line if none found in input
+    # Reconstruct SMTP envelope data for the From_ header
+    # (In particular the date matters: some email clients (e.g. the
+    # one in Apple's iOS) use the IMAP "internal date" derived from
+    # the From_ header to define the display order of messages.)
+
+    # If there is no From_ line giving us a delivery date
     if (!defined $date) {
 	if (defined $header{'Delivery-date'} &&
 	    defined ${$header{'Delivery-date'}}[0]) {
+	    # .. use the  Delivery-date: header ...
 	    ${$header{'Delivery-date'}}[0] =~ /(Mon|Tue|Wed|Thu|Fri|Sat|Sun), ?([ 0-3][0-9]) (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) ([12]\d\d\d) ([012]\d:[0-5]\d:[0-5]\d)( [\+-]\d\d\d\d)/
 		or die("unexpected delivery-date '${$header{'Delivery-date'}}[0]'");
 	    $date = "$1 $3 $2 $5 $4";  # use local time (for simplicity)
 	    $moreinfo = $6 if $6;
 	} elsif (defined $header{'Received'} &&
 	    defined ${$header{'Received'}}[0]) {
+	    # ... or the top-most Received: header ...
 	    ${$header{'Received'}}[0] =~ /(Mon|Tue|Wed|Thu|Fri|Sat|Sun), ?([ 0-3][0-9]) (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) ([12]\d\d\d) ([012]\d:[0-5]\d:[0-5]\d)( [\+-]\d\d\d\d)/
 		or die("unexpected received date '${$header{'Delivery-date'}}[0]'");
 	    $date = "$1 $3 $2 $5 $4";  # use local time (for simplicity)
 	    $moreinfo = $6 if $6;
 	} else {
-	    $date = 'Thu Jan  1 00:00:00 1970'; # dummy date
+	    # ... or the file date
+	    my @s = stat($fn) or die("stat failed: $!\n");
+	    $date = asctime gmtime $s[9];
+	    chomp $date;
 	}
     }
+    # If there is no From_ line giving us a sender address ...
     if (!defined $envsender) {
 	if (defined $header{'Return-path'} &&
 	    defined ${$header{'Return-path'}}[0]) {
+	    # try the Return-path: header ...
 	    if (${$header{'Return-path'}}[0] =~ /^<([^ \t\n]+)>$/ ||
 		${$header{'Return-path'}}[0] =~ /^([^ \t\n]+)$/) {
 		$envsender = $1;
@@ -93,6 +216,7 @@ sub process {
 		die("unexpected Return-path '${$header{'Return-path'}}[0]'\n");	
 	    }
 	} else {
+	    # ... or fill in a placeholder
 	    $envsender = '-';
 	}
     }
@@ -102,13 +226,14 @@ sub process {
 
     die("unterminated final line") unless $msg =~ /\n$/; 
 
+    $msg =~ s/\s+\n$/\n/ if $strip;
+
     return ("From $envsender $date$moreinfo\n", $msg);
 }
 
 # Convert mail data of a single message into mboxrd mailbox format.
 # Prefix each message with a From_ line, then concatenate result
 # to form multi-message mailboxes.
-# http://www.qmail.org/qmail-manual-html/man5/mbox.html
 sub to_mboxrd {
     my ($data) = @_;
     # escape spurious From_ lines
@@ -119,30 +244,9 @@ sub to_mboxrd {
 
 # Convert mail data of a single message into MMDF mailbox format.
 # Concatenate output to form multi-message mailboxes.
-# http://www.tin.org/bin/man.cgi?section=5&topic=mmdf
 sub to_mmdf {
     my ($data) = @_;
     return "\1\1\1\1\n$data\1\1\1\1\n";
-}
-
-unless (@ARGV) {
-    printf STDERR <<EOT;
-This tool takes a list of MH message files and exports them to
-other mailbox formats.
-
-Usage: mh-export [options] path ...
-
-Options:
-
-  -f mmdf    standard output in mmdf format (default)
-  -f mboxrd  standard output in mboxrd format
-
-Command-line arguments are a list of file pathnames to individual MH
-messages. If a path is to a directory, all files in that with names
-consisting only of digits 0-9 will be processed. Use options to
-indicate in which form the messages should be output.
-
-EOT
 }
 
 my $format = 'mmdf';
@@ -155,6 +259,9 @@ while (@ARGV) {
     if ($ARGV[0] eq '-v') {
 	shift @ARGV; $verbose++; next;
     }
+    if ($ARGV[0] eq '-t') {
+	shift @ARGV; $strip++; next;
+    }
     my $fn = shift @ARGV;
     if (-d $fn) {
 	warn("$fn: expanding directory\n") if $verbose;
@@ -166,14 +273,10 @@ while (@ARGV) {
 	next;
     }
     print STDERR "$fn\n" if $verbose;
-    open my $f, '<', $fn or die("Cannot read '$fn': $!\n");
-    local $/;  # enable localized slurp mod
-    my $mh = <$f>;
-    close $f;
     my ($from, $data);
     eval { 
 	local $SIG{__WARN__} = sub { die $_[0] };
-	($from, $data) = process($mh);
+	($from, $data) = process($fn);
     };
     die("$fn: $@") if $@;
     if ($format eq 'mboxrd') {
