@@ -51,6 +51,18 @@ If you want to migrate your MH folders onto an IMAP server, use this
 tool to prepare input for the "mailutil copy" tool from the University
 of Washington IMAP distribution.
 
+Typical application:
+
+  mh-export ~/Mail/path/to/mh/folder >~/folder.mmdf && \
+    mailutil copy folder.mmdf {imap.hermes.cam.ac.uk/tls/user=crsid}new-folder
+
+This will create I<new-folder> on the IMAP server and will fill it
+with all messages found in ~/Mail/path/to/mh/folder. The IMAP folder
+I<new-folder> must not exist initially. (If you want to append
+messages to an existing folder, first upload them to a temporary new
+folder, then use any IMAP client to move them over to the intended
+destination and delete the uploaded and now empty temporary folder.)
+
 =head1 BACKGROUND
 
 This tool was written as a replacement for the MH tool packf. It has
@@ -96,6 +108,13 @@ L<mboxrd file format|http://www.qmail.org/qmail-manual-html/man5/mbox.html>
 
 L<Markus Kuhn|http://www.cl.cam.ac.uk/~mgk25/>, January 2013.
 
+=head1 BUGS
+
+No effort is made in the current version to preserve your "unseen"
+sequence, i.e. whether you have already read a message. (The IMAP
+"\seen" flag can be set with option -s, otherwise your messages may
+show up as unread.)
+
 =head1 SEE ALSO
 
 packf(1), mhpath(1), mailutil(1), 
@@ -124,6 +143,8 @@ Command-line arguments are a list of file pathnames to individual MH
 messages. If a path is to a directory, all files in that with names
 consisting only of digits 0-9 will be processed. Use options to
 indicate in which form the messages should be output.
+
+Full manual: perldoc $0
 
 EOT
 }
