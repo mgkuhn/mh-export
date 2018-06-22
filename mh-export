@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
-# Export Computer Laboratory MH mail files into other mailbox formats
-# Markus Kuhn <http://www.cl.cam.ac.uk/~mgk25/> -- 2013-01-14
+# Export MH mail messages and folders into other mailbox formats
+# Markus Kuhn <http://www.cl.cam.ac.uk/~mgk25/>
 
 =head1 NAME
 
