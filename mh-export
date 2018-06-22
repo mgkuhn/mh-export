@@ -117,7 +117,7 @@ show up as unread.)
 
 =head1 SEE ALSO
 
-packf(1), mhpath(1), mailutil(1), 
+packf(1), mhpath(1), mailutil(1),
 
 =cut
 
@@ -156,7 +156,7 @@ my $seen = 0;
 sub process {
     my ($fn) =@_;
     my $msg;
-    
+
     open my $f, '<', $fn or die("$!\n");
     {
 	local $/;  # enable localized slurp mod
@@ -244,7 +244,7 @@ sub process {
 		${$header{'Return-path'}}[0] =~ /^([^ \t\n]+)$/) {
 		$envsender = $1;
 	    } else {
-		die("unexpected Return-path '${$header{'Return-path'}}[0]'\n");	
+		die("unexpected Return-path '${$header{'Return-path'}}[0]'\n");
 	    }
 	} else {
 	    # ... or fill in a placeholder
@@ -255,7 +255,7 @@ sub process {
 	$moreinfo = '';
     }
 
-    die("unterminated final line") unless $msg =~ /\n$/; 
+    die("unterminated final line") unless $msg =~ /\n$/;
 
     $msg =~ s/\s+\n$/\n/ if $strip;
 
@@ -308,7 +308,7 @@ while (@ARGV) {
     }
     print STDERR "$fn\n" if $verbose;
     my ($from, $data);
-    eval { 
+    eval {
 	local $SIG{__WARN__} = sub { die $_[0] };
 	($from, $data) = process($fn);
     };
