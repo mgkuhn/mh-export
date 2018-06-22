@@ -255,9 +255,13 @@ sub process {
 	$moreinfo = '';
     }
 
-    die("unterminated final line") unless $msg =~ /\n$/;
+    # ensure final newline
+    unless ($msg =~ /\n\z/) {
+	$msg .= "\n";
+	warn("$fn: missing line-feed character appended to final line\n");
+    }
 
-    $msg =~ s/\s+\n$/\n/ if $strip;
+    $msg =~ s/\s+\n\z/\n/ if $strip;
 
     return ("From $envsender $date$moreinfo\n", $msg);
 }
@@ -309,7 +313,6 @@ while (@ARGV) {
     print STDERR "$fn\n" if $verbose;
     my ($from, $data);
     eval {
-	local $SIG{__WARN__} = sub { die $_[0] };
 	($from, $data) = process($fn);
     };
     die("$fn: $@") if $@;
