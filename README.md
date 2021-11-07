@@ -8,7 +8,7 @@ System](https://en.wikipedia.org/wiki/MH_Message_Handling_System)
 stores each mailbox message in a separate file. Some other mail-handling tools
 instead store entire message folders in a single file, using the
 [MMDF](http://www.tin.org/bin/man.cgi?section=5&topic=mmdf) or
-[mboxrd](http://www.qmail.org/qmail-manual-html/man5/mbox.html) file
+[mboxrd](http://qmail.org/man/man5/mbox.html) file
 formats.
 
 This Perl script packs the list of MH message files or folders
@@ -22,13 +22,13 @@ to a loss of information.)
 If you want to migrate your MH folders onto an IMAP server, first use
 this tool to prepare an MMDF mailbox file, which you can then upload
 via IMAP using the ```mailutil copy``` tool from the [University of
-Washington IMAP distribution](http://www.washington.edu/imap/).
+Washington IMAP distribution](https://en.wikipedia.org/wiki/UW_IMAP).
 
 Example:
 
 ```
 $ mh-export ~/Mail/path/to/mh/folder >~/folder.mmdf && \
-> mailutil copy folder.mmdf {imap.hermes.cam.ac.uk/tls/user=crsid}new-folder
+> mailutil copy folder.mmdf {imap.hermes.cam.ac.uk/ssl/user=crsid}new-folder
 ```
 
 This will create `new-folder` on the IMAP server and will fill it with
