@@ -16,7 +16,7 @@ mhpath ... | xargs mh-export [options]
 
 The path values given on the command line can either be individual MH
 messages or entire MH folders. If a folder is provided, the tool reads
-all messages in it in numercial order, but does not recurse into
+all messages in it in numerical order, but does not recurse into
 subfolders.
 
 Unlike with MH tools such packf, you have to specify folders and
@@ -74,10 +74,10 @@ lack of which can lead to a loss of information:
 =item *
 Handle Resent: and Replied: headers that have been prepended to
 a message by the MUA after it was delivered. Exmh adds these,
-but they are not RFC 2822 and can preceed the From_ line.
+but they are not RFC 2822 and can precede the From_ line.
 
 =item *
-Try to preserve as much informaion as possible in the From_
+Try to preserve as much information as possible in the From_
 lines, rather than inserting just a dummy one. In particular,
 try hard to estimate the delivery time.
 
