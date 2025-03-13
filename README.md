@@ -28,7 +28,7 @@ Example:
 
 ```
 $ mh-export ~/Mail/path/to/mh/folder >~/folder.mmdf && \
-> mailutil copy folder.mmdf {imap.hermes.cam.ac.uk/ssl/user=crsid}new-folder
+  mailutil copy folder.mmdf {imap.fastmail.com/ssl/user=crsid@fm.cl.cam.ac.uk}new-folder
 ```
 
 This will create `new-folder` on the IMAP server and will fill it with
@@ -37,6 +37,12 @@ all messages found in `~/Mail/path/to/mh/folder/`. The IMAP folder
 to an existing folder, first upload them to a temporary new folder,
 then use any IMAP client to move them over to the intended destination
 and delete the uploaded and now empty temporary folder.)
+
+The `mailutil` command will ask for an IMAP password.
+Security-conscious service providers may not accept your webmail login
+password for IMAP authentication, and there you will have to set up a
+dedicated “app password” first. Example: [fastmail.com app
+password](https://www.fastmail.help/hc/en-us/articles/360058752854).
 
 ## Installation
 

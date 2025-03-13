@@ -54,7 +54,7 @@ of Washington IMAP distribution.
 Typical application:
 
   mh-export ~/Mail/path/to/mh/folder >~/folder.mmdf && \
-    mailutil copy folder.mmdf {imap.hermes.cam.ac.uk/tls/user=crsid}new-folder
+    mailutil copy folder.mmdf {imap.fastmail.com/ssl/user=crsid@fm.cl.cam.ac.uk}new-folder
 
 This will create I<new-folder> on the IMAP server and will fill it
 with all messages found in ~/Mail/path/to/mh/folder. The IMAP folder
@@ -100,7 +100,7 @@ require any >From_ escaping.
 L<MMDF mailbox file format|http://www.tin.org/bin/man.cgi?section=5&topic=mmdf>
 
 =item *
-L<mboxrd file format|http://www.qmail.org/qmail-manual-html/man5/mbox.html>
+L<mboxrd file format|http://qmail.org/man/man5/mbox.html>
 
 =back
 
